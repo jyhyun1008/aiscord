@@ -72,6 +72,40 @@
   font-family: var(--font-mono);
   font-size: 0.875em;
 }
+.markdown .task-item {
+  margin-left: -20px;
+  list-style: none;
+}
+.markdown .task-item input {
+  margin: 0 4px 0 0;
+  vertical-align: -2px;
+}
+.markdown .katex-block,
+.markdown .katex-display {
+  max-width: 100%;
+  margin: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.markdown .katex-error {
+  color: var(--danger);
+}
+.markdown .image-link {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.markdown .footnote-ref {
+  font-size: 0.75em;
+}
+.markdown .footnotes {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.markdown .footnotes-sep {
+  margin: 12px 0 8px;
+}
 .code-block {
   margin: 0 0 8px;
   border: 1px solid var(--border);

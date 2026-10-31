@@ -22,7 +22,7 @@ const nameStyle = computed(() => {
   if (!isAi.value || ui.ai.name) return undefined
   return { color: `hsl(${hueOf(authorName.value)} 65% var(--name-l))` }
 })
-const html = computed(() => (isAi.value ? renderMarkdown(m.value.content) : ''))
+const html = computed(() => (isAi.value ? renderMarkdown(m.value.content, m.value.id) : ''))
 
 const copied = ref(false)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined

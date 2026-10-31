@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#5865f2"/><path fill="#fff" d="M32 11l5 15 15 6-15 5-5 16-5-16-15-5 15-6z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="51.2 51.2 409.6 409.6">
+  <title>Aiscord</title>
+  <rect width="512" height="512" fill="#5865f2"/>
+  <!-- Match Miscord's controller silhouette, with one large AI sparkle in the center. -->
+  <path fill="#fff" transform="translate(256 256) scale(.8 1.064) translate(-256 -248.5)" d="M182 141c-28 5-51 14-70 24-29 43-45 94-48 151 23 19 48 31 74 40l18-28-23-12 6-5c73 34 161 34 234 0l6 5-23 12 18 28c26-9 51-21 74-40-3-57-19-108-48-151-19-10-42-19-70-24l-9 18c-43-7-87-7-130 0z"/>
+  <path fill="#5865f2" d="M256 198c10 38 23 51 61 62-38 11-51 24-61 62-10-38-23-51-61-62 38-11 51-24 61-62z"/>
+</svg>
