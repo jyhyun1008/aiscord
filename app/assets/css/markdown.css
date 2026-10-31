@@ -1,0 +1,173 @@
+/* Rendered answers; every rule is scoped so it can't leak into the app chrome */
+.markdown {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown p {
+  margin: 0 0 8px;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 16px 0 8px;
+  color: var(--fg-strong);
+  line-height: 1.25;
+}
+.markdown h1 {
+  font-size: 22px;
+}
+.markdown h2 {
+  font-size: 19px;
+}
+.markdown h3,
+.markdown h4 {
+  font-size: 16px;
+}
+.markdown ul,
+.markdown ol {
+  margin: 0 0 8px;
+  padding-left: 24px;
+}
+.markdown li + li {
+  margin-top: 2px;
+}
+.markdown blockquote {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 4px solid var(--fg-faint);
+  color: var(--fg-muted);
+}
+.markdown hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+.markdown table {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+.markdown th {
+  background: var(--bg-embed);
+  color: var(--fg-strong);
+}
+.markdown :not(pre) > code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-embed);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+.code-block {
+  margin: 0 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.code-head button {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.code-head button:hover {
+  background: var(--bg-active);
+  color: var(--fg);
+}
+.code-block pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+}
+.code-block code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #7f8690;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag {
+  color: #c792ea;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a5d6a7;
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: #f6a878;
+}
+.hljs-title,
+.hljs-section,
+.hljs-name {
+  color: #82aaff;
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-attr,
+.hljs-attribute {
+  color: #7fd6e8;
+}
+.hljs-deletion {
+  color: #f28b82;
+}
+:root[data-theme='light'] .hljs-keyword,
+:root[data-theme='light'] .hljs-selector-tag,
+:root[data-theme='light'] .hljs-doctag {
+  color: #8839c4;
+}
+:root[data-theme='light'] .hljs-string,
+:root[data-theme='light'] .hljs-regexp,
+:root[data-theme='light'] .hljs-addition {
+  color: #2d7d32;
+}
+:root[data-theme='light'] .hljs-number,
+:root[data-theme='light'] .hljs-literal,
+:root[data-theme='light'] .hljs-symbol,
+:root[data-theme='light'] .hljs-bullet {
+  color: #b5531a;
+}
+:root[data-theme='light'] .hljs-title,
+:root[data-theme='light'] .hljs-section,
+:root[data-theme='light'] .hljs-name {
+  color: #2c5fc9;
+}
+:root[data-theme='light'] .hljs-type,
+:root[data-theme='light'] .hljs-built_in,
+:root[data-theme='light'] .hljs-attr,
+:root[data-theme='light'] .hljs-attribute {
+  color: #0b7285;
+}

@@ -1,0 +1,61 @@
+# Aiscord
+
+디스코드처럼 생긴 [OpenRouter](https://openrouter.ai) 클라이언트. 서버 없이 브라우저에서 OpenRouter API를 직접 호출합니다.
+
+## 실행
+
+```sh
+npm install
+npm run dev      # http://localhost:3224
+```
+
+설정(왼쪽 아래 톱니바퀴)에 [OpenRouter API 키](https://openrouter.ai/keys)를 넣으면 바로 쓸 수 있어요.
+
+정적 호스팅용 빌드는 `npm run generate` (`.output/public`), 테스트는 `npm test`, 타입 검사는 `npm run typecheck`.
+
+## 구조
+
+| 디스코드 | Aiscord |
+| --- | --- |
+| 채널 | 프로젝트 — 지침(시스템 프롬프트)과 기본 모델을 가짐 |
+| 포럼 게시글 | 스레드 — 프로젝트 안에서 카드로 모아 보고, 스레드마다 모델을 바꿀 수 있음 |
+| 메시지 | 질문과 답변 — 마크다운 렌더링, 스트리밍, 원문(raw) 복사, 다시 생성, 질문 수정, 삭제 |
+| 서버 훑어보기 | 프로젝트 훑어보기 — 전체 통계, API 키의 실제 사용액, 프로젝트별 지침과 토큰·비용 |
+| 멤버 목록 | 북마크 AI — 누르면 스레드의 모델, 프로젝트 화면에서는 기본 모델이 바뀜 |
+
+## AI의 기억
+
+모델은 이전 대화를 기억하지 않아서, 질문할 때마다 프로젝트 지침과 메모, 스레드 대화를 함께 보냅니다.
+
+- **요약:** 대화가 입력 한도의 75%(최대 80,000토큰, 추정치)를 넘으면 오래된 메시지를 스레드의 모델로 요약해 대신 보내요. 화면의 원문은 그대로 남습니다. 요약이 실패하면 가장 오래된 메시지부터 빼고 보내요.
+- **메모:** 메시지의 `메모에 저장`으로 프로젝트에 내용을 남기면 그 프로젝트의 모든 스레드에 전달돼요. 프로젝트 편집에서 고칠 수 있습니다.
+
+## 로고
+
+`public/icons/ai`의 회사 로고는 [@lobehub/icons-static-svg](https://github.com/lobehub/lobe-icons)(MIT)에서 가져왔어요. 각 로고의 상표권은 해당 회사에 있습니다.
+
+## 백업과 동기화
+
+설정의 `내보내기`와 `가져오기`로 프로젝트, 메모, 스레드, 대화 내용을 JSON 파일로 옮길 수 있어요. API 키, 프로필, 북마크는 포함되지 않습니다.
+
+구글 드라이브 동기화는 같은 데이터를 앱 전용 숨김 폴더에 저장해요. 스레드 단위로 더 최근에 바뀐 쪽이 남습니다. 켜려면 OAuth 클라이언트 ID가 필요해요.
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 만들고 Google Drive API를 켭니다.
+2. OAuth 동의 화면을 만들고 `.../auth/drive.appdata` 범위를 추가합니다.
+3. 사용자 인증 정보에서 웹 애플리케이션용 OAuth 클라이언트 ID를 만들고, 승인된 JavaScript 원본에 `https://aiscord.gongran.studio`와 `http://localhost:3224`를 넣습니다.
+4. 로컬에서는 `.env`에, 배포에서는 GitHub 저장소 변수에 `NUXT_PUBLIC_GOOGLE_CLIENT_ID`로 넣습니다. 클라이언트 ID는 공개돼도 되는 값이에요.
+
+서버가 없어서 연결은 약 1시간마다 다시 눌러야 합니다. 연결된 동안은 변경 후 30초가 지나면 자동으로 동기화돼요.
+
+## 배포
+
+`main`에 push하면 GitHub Actions가 GitHub Pages로 배포합니다(`.github/workflows/deploy.yml`). 도메인은 `public/CNAME`의 `aiscord.gongran.studio`이고, DNS에 `jyhyun1008.github.io`를 가리키는 CNAME이 필요해요.
+
+## 데이터 저장
+
+| 위치 | 내용 |
+| --- | --- |
+| localStorage | API 키, 프로필(닉네임·프사), 테마, 북마크한 모델, 프로젝트와 스레드 목록 |
+| IndexedDB | 스레드별 대화 내용 — localStorage 용량을 넘기기 쉬워서 분리 |
+
+API 키는 암호화 없이 저장됩니다. 브라우저 데이터를 지우면 대화 내용도 함께 사라져요.
