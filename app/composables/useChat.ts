@@ -13,6 +13,8 @@ export interface Message {
   usage?: Usage
   error?: string
   pending?: boolean
+  /** Stopped at the project preset's answer limit */
+  truncated?: boolean
 }
 
 const SAVE_INTERVAL = 1000
@@ -102,14 +104,15 @@ export function useChat() {
 
   /** The prompt for the next answer, summarizing old messages first when they no longer fit. */
   async function buildRequest(thread: Thread, project: Project, list: Message[], signal: AbortSignal) {
+    const preset = contextPreset(project.preset)
     await models.load()
     const contextLength = models.models.value?.find(m => m.id === thread.model)?.contextLength
     const cut = list.findIndex(m => m.id === thread.summarizedUntil)
     let recent = usableMessages(list.slice(cut + 1))
     let summary = cut >= 0 ? thread.summary : undefined
 
-    const system = () => buildSystemPrompt({ instructions: project.instructions, memo: project.memo, summary })
-    const room = () => contextBudget(contextLength) - estimateTokens(system())
+    const system = () => buildSystemPrompt({ instructions: project.instructions, memo: project.memo, summary, concise: preset.concise })
+    const room = () => contextBudget(contextLength, preset.contextTokens) - estimateTokens(system())
 
     const split = splitForSummary(recent, room())
     if (split) {
@@ -129,9 +132,10 @@ export function useChat() {
       }
     }
 
-    const messages: ApiMessage[] = trimToBudget(recent, room()).map(m => ({ role: m.role, content: m.content }))
+    const messages = trimToBudget(recent, room()).map(m => ({ role: m.role, content: m.content }))
     const prompt = system()
-    return prompt ? [{ role: 'system' as const, content: prompt }, ...messages] : messages
+    const request = prompt ? [{ role: 'system' as const, content: prompt }, ...messages] : messages
+    return withCacheBreakpoints(request, thread.model) as ApiMessage[]
   }
 
   /** A summary built from a message that just changed would keep telling the model the old version. */
@@ -162,23 +166,25 @@ export function useChat() {
     models.touch(thread.model)
     persist(threadId)
 
+    const preset = contextPreset(project.preset)
     let lastSave = Date.now()
     try {
       const messages = await buildRequest(thread, project, list, controller.signal)
       await streamChat(
-        { apiKey: ui.apiKey, model: thread.model, messages, signal: controller.signal },
+        { apiKey: ui.apiKey, model: thread.model, messages, signal: controller.signal, maxTokens: preset.maxTokens, effort: preset.effort },
         (delta) => {
           if (delta.content) reply.content += delta.content
           if (delta.reasoning) reply.reasoning = (reply.reasoning ?? '') + delta.reasoning
           if (delta.model) reply.model = delta.model
           if (delta.usage) reply.usage = delta.usage
+          if (delta.finishReason === 'length') reply.truncated = true
           if (Date.now() - lastSave > SAVE_INTERVAL) {
             lastSave = Date.now()
             persist(threadId)
           }
         },
       )
-      if (!reply.content) reply.error = '모델이 빈 답변을 보냈어요'
+      if (!reply.content) reply.error = reply.truncated ? '추론에 최대 답변 길이를 다 써서 내용이 없어요' : '모델이 빈 답변을 보냈어요'
     }
     catch (e) {
       if (!controller.signal.aborted) reply.error = e instanceof Error ? e.message : String(e)

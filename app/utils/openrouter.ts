@@ -11,15 +11,25 @@ export interface Model {
   completionPrice: number | null
 }
 
+export interface ContentPart {
+  type: 'text'
+  text: string
+  cache_control?: { type: 'ephemeral' }
+}
+
 export interface ApiMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | ContentPart[]
 }
+
+export type ReasoningEffort = 'low' | 'none'
 
 export interface Usage {
   promptTokens: number
   completionTokens: number
   cost: number | null
+  /** Input read back from the provider's cache, at a fraction of the price */
+  cachedTokens?: number
 }
 
 /** What OpenRouter itself has billed to this key, in USD. */
@@ -38,6 +48,8 @@ export interface StreamDelta {
   usage?: Usage
   /** The model that actually answered, which differs from the request for openrouter/auto */
   model?: string
+  /** `length` means the answer hit max_tokens */
+  finishReason?: string
   error?: string
 }
 
@@ -71,11 +83,14 @@ export function parseChunk(data: string): StreamDelta | null {
   if (delta?.content) out.content = delta.content
   if (delta?.reasoning) out.reasoning = delta.reasoning
   if (json.model) out.model = json.model
+  const finishReason = json.choices?.[0]?.finish_reason
+  if (finishReason) out.finishReason = finishReason
   if (json.usage) {
     out.usage = {
       promptTokens: json.usage.prompt_tokens ?? 0,
       completionTokens: json.usage.completion_tokens ?? 0,
       cost: json.usage.cost ?? null,
+      cachedTokens: json.usage.prompt_tokens_details?.cached_tokens ?? 0,
     }
   }
   // Failures after the headers are sent arrive here, with HTTP status still 200
@@ -151,7 +166,14 @@ export async function completeChat(options: { apiKey: string, model: string, mes
 
 /** POST a streaming completion and report each chunk; resolves when the stream ends. Throws on failure. */
 export async function streamChat(
-  options: { apiKey: string, model: string, messages: ApiMessage[], signal: AbortSignal },
+  options: {
+    apiKey: string
+    model: string
+    messages: ApiMessage[]
+    signal: AbortSignal
+    maxTokens?: number | null
+    effort?: ReasoningEffort | null
+  },
   onDelta: (delta: StreamDelta) => void,
 ) {
   const res = await fetch(`${API}/chat/completions`, {
@@ -162,7 +184,13 @@ export async function streamChat(
       'Content-Type': 'application/json',
       'X-Title': 'Aiscord',
     },
-    body: JSON.stringify({ model: options.model, messages: options.messages, stream: true }),
+    body: JSON.stringify({
+      model: options.model,
+      messages: options.messages,
+      stream: true,
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+      ...(options.effort ? { reasoning: { effort: options.effort } } : {}),
+    }),
   })
   if (!res.ok || !res.body) throw new Error(await errorMessage(res))
 

@@ -1,3 +1,5 @@
+import type { PresetId } from '~/utils/context'
+
 export interface Project {
   id: string
   name: string
@@ -7,6 +9,8 @@ export interface Project {
   memo?: string
   /** Model new threads start with */
   model: string
+  /** How much to spend on each question; unset means the default */
+  preset?: PresetId
   /** Last edit, for choosing between copies when syncing; the seed project has none */
   changedAt?: number
 }

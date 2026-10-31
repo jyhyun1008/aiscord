@@ -171,8 +171,11 @@ function remove() {
           </div>
         </div>
 
+        <p v-if="m.truncated && m.content" class="truncated">프로젝트의 최대 답변 길이에서 끊겼어요</p>
+
         <p v-if="m.usage" class="usage">
           {{ formatTokens(m.usage.promptTokens) }} → {{ formatTokens(m.usage.completionTokens) }} 토큰
+          <template v-if="m.usage.cachedTokens"> · 캐시 {{ formatTokens(m.usage.cachedTokens) }}</template>
           <template v-if="m.usage.cost !== null"> · {{ formatCost(m.usage.cost) }}</template>
         </p>
       </div>
@@ -369,6 +372,11 @@ function remove() {
 .error button {
   flex-shrink: 0;
   text-decoration: underline;
+}
+.truncated {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--fg-muted);
 }
 .usage {
   margin: 4px 0 0;

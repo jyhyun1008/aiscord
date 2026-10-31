@@ -54,3 +54,9 @@ test('[DONE] and malformed payloads produce nothing', () => {
   assert.equal(parseChunk('[DONE]'), null)
   assert.equal(parseChunk('{oops'), null)
 })
+
+test('cached input and a length stop are reported', () => {
+  const usage = parseChunk('{"choices":[{"delta":{},"finish_reason":"length"}],"usage":{"prompt_tokens":100,"completion_tokens":5,"prompt_tokens_details":{"cached_tokens":80}}}')
+  assert.equal(usage.usage.cachedTokens, 80)
+  assert.equal(usage.finishReason, 'length')
+})

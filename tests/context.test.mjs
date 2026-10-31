@@ -8,7 +8,7 @@ const source = await readFile(new URL('../app/utils/context.ts', import.meta.url
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } })
 const exports = {}
 vm.runInNewContext(outputText, { exports })
-const { estimateTokens, contextBudget, usableMessages, splitForSummary, trimToBudget, buildSystemPrompt, summaryRequest } = exports
+const { estimateTokens, contextBudget, contextPreset, usableMessages, splitForSummary, trimToBudget, buildSystemPrompt, summaryRequest, withCacheBreakpoints } = exports
 
 const user = content => ({ role: 'user', content })
 const ai = content => ({ role: 'assistant', content })
@@ -19,10 +19,40 @@ test('Korean text counts heavier than Latin text of the same length', () => {
   assert.ok(estimateTokens('가나다라마바사아') > 4)
 })
 
-test('the budget follows the model but stays capped and has a default', () => {
-  assert.equal(contextBudget(8000), 6000)
-  assert.equal(contextBudget(2000000), 80000)
-  assert.equal(contextBudget(null), 24000)
+test('the budget follows the model but stays under the preset and has a default', () => {
+  assert.equal(contextBudget(8000, 32000), 6000)
+  assert.equal(contextBudget(2000000, 32000), 32000)
+  assert.equal(contextBudget(null, 80000), 24000)
+})
+
+test('an unset or unknown preset falls back to the default', () => {
+  assert.equal(contextPreset(undefined).label, '기본')
+  assert.equal(contextPreset('gone').label, '기본')
+  assert.equal(contextPreset('save').maxTokens, 2000)
+})
+
+test('the concise line joins the system prompt only when asked', () => {
+  assert.ok(buildSystemPrompt({ instructions: '', concise: true }).includes('간결하게'))
+  assert.equal(buildSystemPrompt({ instructions: '지침', concise: false }), '지침')
+})
+
+const long = words(5000)
+
+test('Claude and Qwen get breakpoints on the system prompt and newest question', () => {
+  for (const model of ['anthropic/claude', '~anthropic/latest', 'qwen/qwen3']) {
+    const out = withCacheBreakpoints([{ role: 'system', content: 's' }, user(long), ai('a'), user('q')], model)
+    assert.equal(out[0].content[0].cache_control.type, 'ephemeral')
+    assert.equal(typeof out[1].content, 'string')
+    assert.equal(typeof out[2].content, 'string')
+    assert.equal(out[3].content[0].text, 'q')
+  }
+})
+
+test('providers that cache by themselves and short prompts stay plain', () => {
+  const big = [user(long)]
+  assert.equal(typeof withCacheBreakpoints(big, 'openai/gpt-5')[0].content, 'string')
+  assert.equal(typeof withCacheBreakpoints(big, 'openrouter/auto')[0].content, 'string')
+  assert.equal(typeof withCacheBreakpoints([user('q')], 'anthropic/claude')[0].content, 'string')
 })
 
 test('failed and unfinished turns are left out, partial answers stay', () => {

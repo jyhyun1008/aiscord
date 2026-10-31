@@ -130,6 +130,7 @@ function open(project: Project) {
             <span><Icon name="thread" :size="12" /> 스레드 {{ c.threads }}개</span>
             <span>{{ formatTokens(c.tokens) }} 토큰</span>
             <span>{{ formatCost(c.cost) }}</span>
+            <span>{{ contextPreset(c.project.preset).label }}</span>
           </footer>
         </article>
       </div>

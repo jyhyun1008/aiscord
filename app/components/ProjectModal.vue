@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Project } from '~/composables/useWorkspace'
+import type { PresetId } from '~/utils/context'
 
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -11,9 +12,10 @@ const name = ref(props.project?.name ?? '')
 const instructions = ref(props.project?.instructions ?? '')
 const memo = ref(props.project?.memo ?? '')
 const model = ref(props.project?.model ?? DEFAULT_MODEL)
+const preset = ref<PresetId>(props.project?.preset ?? 'default')
 
 function save() {
-  const fields = { name: name.value.trim(), instructions: instructions.value, memo: memo.value, model: model.value }
+  const fields = { name: name.value.trim(), instructions: instructions.value, memo: memo.value, model: model.value, preset: preset.value }
   if (!fields.name) return
   if (props.project) {
     updateProject(props.project.id, fields)
@@ -52,6 +54,13 @@ function remove() {
         <span>새 스레드의 기본 모델</span>
         <ModelPicker v-model="model" />
       </div>
+      <label>
+        <span>토큰 사용량</span>
+        <select v-model="preset" class="field">
+          <option v-for="(p, id) in CONTEXT_PRESETS" :key="id" :value="id">{{ p.label }}</option>
+        </select>
+        <small>{{ CONTEXT_PRESETS[preset].description }}</small>
+      </label>
     </form>
     <template #footer>
       <button v-if="props.project" type="button" class="btn danger delete" @click="remove">삭제</button>

@@ -1,3 +1,5 @@
+import type { ReasoningEffort } from './openrouter'
+
 interface ContextMessage {
   role: 'user' | 'assistant'
   content: string
@@ -9,9 +11,38 @@ interface SystemParts {
   instructions: string
   memo?: string
   summary?: string
+  concise?: boolean
 }
 
-const MAX_CONTEXT_TOKENS = 80000
+export type PresetId = 'default' | 'save' | 'minimal' | 'unlimited'
+
+export interface ContextPreset {
+  label: string
+  description: string
+  /** History to send at most, in estimated tokens */
+  contextTokens: number
+  effort: ReasoningEffort | null
+  /** Answer length limit; reasoning counts toward it on most providers */
+  maxTokens: number | null
+  concise: boolean
+}
+
+export const CONTEXT_PRESETS: Record<PresetId, ContextPreset> = {
+  default: { label: '기본', description: '최근 대화를 넉넉히 보내고 답변은 제한하지 않아요', contextTokens: 32000, effort: null, maxTokens: null, concise: false },
+  save: { label: '절약', description: '일상적인 질문에 알맞아요. 답변이 2,000토큰에서 끊겨요', contextTokens: 12000, effort: 'low', maxTokens: 2000, concise: true },
+  minimal: { label: '최소', description: '짧은 문답용이에요. 추론을 끄고 답변이 1,000토큰에서 끊겨요', contextTokens: 6000, effort: 'none', maxTokens: 1000, concise: true },
+  unlimited: { label: '제한 없음', description: '긴 작업용이에요. 대화를 많이 보내서 질문마다 비용이 커져요', contextTokens: 80000, effort: null, maxTokens: null, concise: false },
+}
+
+export function contextPreset(id: PresetId | undefined) {
+  return CONTEXT_PRESETS[id ?? 'default'] ?? CONTEXT_PRESETS.default
+}
+
+const CONCISE_PROMPT = '꼭 필요한 내용만 간결하게 답해. 서론과 맺음말, 질문을 되풀이하는 말은 생략해.'
+// These caches take explicit markers; the other providers cache on their own
+const CACHE_CONTROL_MODEL = /^~?(anthropic|qwen)\//
+// Writing to a cache costs extra, so a short conversation is better off without one
+const CACHE_MIN_TOKENS = 4000
 const DEFAULT_CONTEXT_LENGTH = 32000
 // Leaves room for the answer, and for the estimate running low
 const CONTEXT_RATIO = 0.75
@@ -31,8 +62,8 @@ export function estimateTokens(text: string) {
  * Tokens of history to send. Capped even for huge models, since the whole history is
  * billed again on every question.
  */
-export function contextBudget(contextLength: number | null | undefined) {
-  return Math.min(MAX_CONTEXT_TOKENS, Math.floor((contextLength ?? DEFAULT_CONTEXT_LENGTH) * CONTEXT_RATIO))
+export function contextBudget(contextLength: number | null | undefined, limit: number) {
+  return Math.min(limit, Math.floor((contextLength ?? DEFAULT_CONTEXT_LENGTH) * CONTEXT_RATIO))
 }
 
 /** Failed and unfinished turns are dropped so they can't confuse the model. */
@@ -75,8 +106,22 @@ export function trimToBudget<T extends ContextMessage>(messages: T[], budget: nu
   return messages.slice(nextUserTurn(messages, start))
 }
 
-export function buildSystemPrompt({ instructions, memo, summary }: SystemParts) {
+/**
+ * Mark the system prompt and the newest question, so the next request can read everything
+ * up to here from the cache.
+ */
+export function withCacheBreakpoints(messages: { role: 'system' | 'user' | 'assistant', content: string }[], model: string) {
+  if (!CACHE_CONTROL_MODEL.test(model)) return messages
+  if (totalTokens(messages as ContextMessage[]) < CACHE_MIN_TOKENS) return messages
+  const lastUser = messages.map(m => m.role).lastIndexOf('user')
+  return messages.map((m, i) => (m.role === 'system' || i === lastUser
+    ? { ...m, content: [{ type: 'text' as const, text: m.content, cache_control: { type: 'ephemeral' as const } }] }
+    : m))
+}
+
+export function buildSystemPrompt({ instructions, memo, summary, concise }: SystemParts) {
   const parts = [instructions.trim()]
+  if (concise) parts.push(CONCISE_PROMPT)
   if (memo?.trim()) parts.push(`## 프로젝트 메모\n${memo.trim()}`)
   if (summary) parts.push(`## 이전 대화 요약\n${summary}`)
   return parts.filter(Boolean).join('\n\n')
