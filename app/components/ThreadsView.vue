@@ -44,6 +44,10 @@ function previewName(t: Thread) {
   return ui.ai.name || models.nameOf(t.model)
 }
 
+function previewStyle(t: Thread) {
+  return { color: `hsl(${hueOf(previewName(t))} 65% var(--name-l))` }
+}
+
 </script>
 
 <template>
@@ -81,17 +85,20 @@ function previewName(t: Thread) {
           @click="open(t)"
           @keydown.enter="open(t)"
         >
+          <span class="tag">
+            <AiAvatar class="tag-logo" :model="t.model" :name="models.nameOf(t.model)" />
+            {{ models.nameOf(t.model) }}
+          </span>
           <h2 class="name">{{ t.title }}</h2>
           <div v-if="t.preview" class="preview">
-            <Avatar v-if="t.previewRole === 'user'" class="pv-avatar" :name="previewName(t)" :src="ui.me.avatar" />
-            <AiAvatar v-else class="pv-avatar" :model="t.model" :name="previewName(t)" />
-            <span class="pv-name">{{ previewName(t) }}</span>
+            <span class="pv-name" :style="previewStyle(t)">{{ previewName(t) }}</span>
             <span class="pv-text">{{ t.preview }}</span>
           </div>
           <p v-else class="pv-empty">아직 메시지가 없어요</p>
           <footer class="meta">
-            <span><Icon name="thread" :size="12" /> 메시지 {{ t.messageCount }}개</span>
-            <span>{{ formatStamp(t.updatedAt) }}</span>
+            <span :title="`메시지 ${t.messageCount}개`"><Icon name="thread" :size="14" /> {{ t.messageCount }}</span>
+            <i class="dot" />
+            <time :title="formatFull(t.updatedAt)">{{ formatStamp(t.updatedAt) }}</time>
           </footer>
         </article>
       </div>
@@ -127,8 +134,8 @@ function previewName(t: Thread) {
   white-space: nowrap;
 }
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 .card {
@@ -161,6 +168,29 @@ function previewName(t: Thread) {
   gap: 8px;
   min-width: 0;
 }
+.tag {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--bg-input);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tag-logo {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+}
 .new-head .field {
   flex: 1;
   min-width: 0;
@@ -170,7 +200,7 @@ function previewName(t: Thread) {
 }
 .name {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--fg-strong);
   overflow: hidden;
@@ -179,16 +209,9 @@ function previewName(t: Thread) {
 }
 .preview {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   font-size: 14px;
-}
-.pv-avatar {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  font-size: 9px;
 }
 .pv-name {
   flex-shrink: 0;
@@ -197,7 +220,10 @@ function previewName(t: Thread) {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
-  color: var(--fg);
+}
+.pv-name::after {
+  content: ':';
+  color: var(--fg-muted);
 }
 .pv-text {
   min-width: 0;
@@ -213,14 +239,21 @@ function previewName(t: Thread) {
 }
 .meta {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   margin-top: 2px;
-  font-size: 12px;
-  color: var(--fg-faint);
+  font-size: 13px;
+  color: var(--fg-muted);
 }
 .meta span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fg-faint);
 }
 </style>
