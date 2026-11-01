@@ -8,7 +8,12 @@ interface ThreadLike extends Stamped {
   projectId: string
 }
 
-export interface Backup<P extends Stamped = Stamped, T extends ThreadLike = ThreadLike, M = unknown> {
+interface SettingsLike {
+  /** 0 until the user changes something, so a fresh device takes the other copy's */
+  changedAt: number
+}
+
+export interface Backup<P extends Stamped = Stamped, T extends ThreadLike = ThreadLike, M = unknown, S extends SettingsLike = SettingsLike> {
   version: 1
   exportedAt: number
   projects: P[]
@@ -17,6 +22,8 @@ export interface Backup<P extends Stamped = Stamped, T extends ThreadLike = Thre
   deleted: Record<string, number>
   /** Thread id → its whole history */
   messages: Record<string, M[]>
+  /** Absent in older backups */
+  settings?: S
 }
 
 const stamp = (item: Stamped) => item.changedAt ?? item.updatedAt ?? 0
@@ -48,9 +55,10 @@ function mergeItems<T extends Stamped>(local: T[], remote: T[], deleted: Record<
 /**
  * Combine two copies thread by thread: the most recently changed thread wins whole, so
  * editing one thread on two devices keeps only the later one. `fromRemote` lists the
- * threads whose history has to be written locally.
+ * threads whose history has to be written locally. Settings are one unit: the newer set
+ * wins, and `settingsFromRemote` says it has to be applied here.
  */
-export function mergeBackups<P extends Stamped, T extends ThreadLike, M>(local: Backup<P, T, M>, remote: Backup<P, T, M>) {
+export function mergeBackups<P extends Stamped, T extends ThreadLike, M, S extends SettingsLike>(local: Backup<P, T, M, S>, remote: Backup<P, T, M, S>) {
   const deleted = { ...local.deleted }
   for (const [id, at] of Object.entries(remote.deleted)) deleted[id] = Math.max(deleted[id] ?? 0, at)
 
@@ -68,15 +76,18 @@ export function mergeBackups<P extends Stamped, T extends ThreadLike, M>(local: 
     if (useRemote) fromRemote.push(thread.id)
   }
 
-  const merged: Backup<P, T, M> = { version: 1, exportedAt: Date.now(), projects, threads, deleted, messages }
-  return { merged, fromRemote }
+  const settingsFromRemote = !!remote.settings && remote.settings.changedAt > (local.settings?.changedAt ?? -1)
+  const settings = settingsFromRemote ? remote.settings : local.settings
+
+  const merged: Backup<P, T, M, S> = { version: 1, exportedAt: Date.now(), projects, threads, deleted, messages, settings }
+  return { merged, fromRemote, settingsFromRemote }
 }
 
 /**
  * A fresh install starts with a seed project. Leave it out when the other copy already has
  * projects, or every new device adds another empty #일반.
  */
-export function dropUntouchedSeed<P extends Stamped, T extends ThreadLike, M>(local: Backup<P, T, M>, remote: Backup<P, T, M>) {
+export function dropUntouchedSeed<P extends Stamped, T extends ThreadLike, M, S extends SettingsLike>(local: Backup<P, T, M, S>, remote: Backup<P, T, M, S>) {
   if (!remote.projects.length) return local
   const used = new Set(local.threads.map(t => t.projectId))
   return { ...local, projects: local.projects.filter(p => p.changedAt !== undefined || used.has(p.id)) }

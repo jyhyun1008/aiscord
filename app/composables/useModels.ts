@@ -54,5 +54,10 @@ export function useModels() {
     saveJson(BOOKMARKS_KEY, bookmarks.value)
   }
 
-  return { models, error, recent, bookmarks, sort, grouped, load, nameOf, touch, isBookmarked, toggleBookmark }
+  function setBookmarks(ids: string[]) {
+    bookmarks.value = ids
+    saveJson(BOOKMARKS_KEY, ids)
+  }
+
+  return { models, error, recent, bookmarks, sort, grouped, load, nameOf, touch, isBookmarked, toggleBookmark, setBookmarks }
 }

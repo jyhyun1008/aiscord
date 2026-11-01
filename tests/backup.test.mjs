@@ -72,3 +72,21 @@ test('files that are not Aiscord backups are refused', () => {
   assert.throws(() => parseBackup('{"version":2}'), /백업 파일이 아니에요/)
   assert.equal(parseBackup('{"version":1,"projects":[],"threads":[]}').threads.length, 0)
 })
+
+test('the newer settings win as a whole, in either direction', () => {
+  const old = backup({ settings: { changedAt: 5, name: '옛' } })
+  const fresh = backup({ settings: { changedAt: 9, name: '새' } })
+  const pulled = mergeBackups(old, fresh)
+  assert.equal(pulled.merged.settings.name, '새')
+  assert.equal(pulled.settingsFromRemote, true)
+  const kept = mergeBackups(fresh, old)
+  assert.equal(kept.merged.settings.name, '새')
+  assert.equal(kept.settingsFromRemote, false)
+})
+
+test('a device nobody has set up takes the other copy, and an older backup changes nothing', () => {
+  assert.equal(mergeBackups(backup({ settings: { changedAt: 0 } }), backup({ settings: { changedAt: 3 } })).settingsFromRemote, true)
+  const result = mergeBackups(backup({ settings: { changedAt: 3, name: '내 것' } }), backup())
+  assert.equal(result.settingsFromRemote, false)
+  assert.equal(result.merged.settings.name, '내 것')
+})

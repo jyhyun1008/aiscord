@@ -74,7 +74,7 @@ async function onImport() {
         </button>
       </div>
       <p class="hint">
-        프로젝트, 메모, 스레드와 대화 내용이 포함돼요. API 키와 프로필, 북마크는 기기마다 따로예요.
+        프로젝트, 메모, 대화 내용과 프로필, 북마크, 테마가 포함돼요. API 키는 포함되지 않으니 기기마다 입력해 주세요.
         <template v-if="sync.enabled">
           드라이브 연결은 약 1시간 유지되고, 그동안은 바뀐 내용이 자동으로 올라가요.
           <template v-if="sync.status.lastSyncedAt">마지막 동기화: {{ formatStamp(sync.status.lastSyncedAt) }}</template>

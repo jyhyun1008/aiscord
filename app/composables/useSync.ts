@@ -1,11 +1,24 @@
 import type { Message } from '~/composables/useChat'
+import type { Profile, ThemeMode } from '~/composables/useUi'
 import type { Project, Thread } from '~/composables/useWorkspace'
 import type { Backup } from '~/utils/backup'
 import type { DriveToken } from '~/utils/googleDrive'
 
-type AppBackup = Backup<Project, Thread, Message>
+/** Everything personal that travels with the data; the API key deliberately doesn't. */
+interface AppSettings {
+  changedAt: number
+  me: Profile
+  ai: Profile
+  bookmarks: string[]
+  summaryModel: string
+  theme: ThemeMode
+  accent: string
+}
+
+type AppBackup = Backup<Project, Thread, Message, AppSettings>
 
 const LAST_SYNC_KEY = 'aiscord:last-sync'
+const SETTINGS_STAMP_KEY = 'aiscord:settings-changed-at'
 // Long enough that a conversation in progress isn't uploaded after every answer
 const AUTO_SYNC_DELAY = 30000
 const TOKEN_MARGIN = 60000
@@ -18,11 +31,15 @@ const status = reactive({
 })
 let token: DriveToken | null = null
 let timer: ReturnType<typeof setTimeout> | undefined
+let settingsChangedAt = loadJson(SETTINGS_STAMP_KEY, 0)
+// Settings arriving from another device aren't a change made here
+let applyingSettings = false
 
 export function useSync() {
   const ui = useUi()
   const chat = useChat()
   const workspace = useWorkspace()
+  const models = useModels()
   const toast = useToast()
   const clientId = useRuntimeConfig().public.googleClientId as string
 
@@ -34,17 +51,51 @@ export function useSync() {
     for (const thread of threads) {
       messages[thread.id] = chat.histories.get(thread.id) ?? await idbGet<Message[]>(thread.id) ?? []
     }
+    const settings: AppSettings = {
+      changedAt: settingsChangedAt,
+      me: ui.me,
+      ai: ui.ai,
+      bookmarks: models.bookmarks.value,
+      summaryModel: ui.summaryModel,
+      theme: ui.theme,
+      accent: ui.accent,
+    }
     // Plain copies: reactive proxies can't go through IndexedDB
-    return JSON.parse(JSON.stringify({ version: 1, exportedAt: Date.now(), projects, threads, deleted, messages }))
+    return JSON.parse(JSON.stringify({ version: 1, exportedAt: Date.now(), projects, threads, deleted, messages, settings }))
   }
 
-  async function apply({ merged, fromRemote }: ReturnType<typeof mergeBackups<Project, Thread, Message>>) {
+  async function applySettings(settings: AppSettings) {
+    applyingSettings = true
+    Object.assign(ui, {
+      me: settings.me,
+      ai: settings.ai,
+      summaryModel: settings.summaryModel,
+      theme: settings.theme,
+      accent: settings.accent,
+    })
+    models.setBookmarks(settings.bookmarks)
+    settingsChangedAt = settings.changedAt
+    saveJson(SETTINGS_STAMP_KEY, settingsChangedAt)
+    // The watcher that would call this a local change runs on the next tick
+    await nextTick()
+    applyingSettings = false
+  }
+
+  function markSettingsChanged() {
+    if (applyingSettings) return
+    settingsChangedAt = Date.now()
+    saveJson(SETTINGS_STAMP_KEY, settingsChangedAt)
+    schedule()
+  }
+
+  async function apply({ merged, fromRemote, settingsFromRemote }: ReturnType<typeof mergeBackups<Project, Thread, Message, AppSettings>>) {
     const kept = new Set(merged.threads.map(t => t.id))
     for (const thread of workspace.state.threads) {
       if (!kept.has(thread.id)) chat.dropHistory(thread.id)
     }
     for (const id of fromRemote) await chat.replaceHistory(id, merged.messages[id] ?? [])
     workspace.replaceAll(merged.projects, merged.threads, merged.deleted)
+    if (settingsFromRemote) await applySettings(merged.settings!)
   }
 
   function ensureIdle() {
@@ -135,5 +186,5 @@ export function useSync() {
     }
   }
 
-  return { status, enabled: !!clientId, syncNow, schedule, exportFile, importFile }
+  return { status, enabled: !!clientId, syncNow, schedule, markSettingsChanged, exportFile, importFile }
 }

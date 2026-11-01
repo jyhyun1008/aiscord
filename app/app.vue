@@ -8,6 +8,7 @@ const projectForm = useState<Project | 'new' | null>('project-form', () => null)
 
 const sync = useSync()
 const { revision } = useWorkspace()
+const { bookmarks } = useModels()
 
 const projectId = computed(() => route.params.project as string | undefined)
 const threadId = computed(() => route.params.thread as string | undefined)
@@ -22,6 +23,7 @@ watch(() => ui.accent, applyAccent)
 watch(() => ui.apiKey, key => saveJson('aiscord:api-key', key))
 watch(() => ui.summaryModel, id => saveJson('aiscord:summary-model', id))
 watch(revision, sync.schedule)
+watch(() => [ui.me, ui.ai, ui.summaryModel, ui.theme, ui.accent, bookmarks.value], sync.markSettingsChanged, { deep: true })
 watch(() => ui.me, me => saveJson('aiscord:me', me), { deep: true })
 watch(() => ui.ai, ai => saveJson('aiscord:ai', ai), { deep: true })
 </script>
