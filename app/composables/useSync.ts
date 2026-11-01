@@ -19,6 +19,8 @@ type AppBackup = Backup<Project, Thread, Message, AppSettings>
 
 const LAST_SYNC_KEY = 'aiscord:last-sync'
 const SETTINGS_STAMP_KEY = 'aiscord:settings-changed-at'
+const TOKEN_KEY = 'aiscord:drive-token'
+const UNSYNCED_KEY = 'aiscord:unsynced'
 // Long enough that a conversation in progress isn't uploaded after every answer
 const AUTO_SYNC_DELAY = 30000
 const TOKEN_MARGIN = 60000
@@ -28,9 +30,14 @@ const status = reactive({
   /** Holds a usable token, so changes upload on their own */
   connected: false,
   lastSyncedAt: loadJson<number | null>(LAST_SYNC_KEY, null),
+  /** Local changes Drive doesn't have yet */
+  unsynced: loadJson(UNSYNCED_KEY, false),
 })
-let token: DriveToken | null = null
+// Kept across reloads; it only reaches this app's hidden Drive folder, and expires by itself
+let token = loadJson<DriveToken | null>(TOKEN_KEY, null)
 let timer: ReturnType<typeof setTimeout> | undefined
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
+let changes = 0
 let settingsChangedAt = loadJson(SETTINGS_STAMP_KEY, 0)
 // Settings arriving from another device aren't a change made here
 let applyingSettings = false
@@ -44,6 +51,31 @@ export function useSync() {
   const clientId = useRuntimeConfig().public.googleClientId as string
 
   const hasToken = () => !!token && token.expiresAt - TOKEN_MARGIN > Date.now()
+
+  /** Someone who uses Drive has changes that won't upload until they reconnect. */
+  const needsReconnect = computed(() =>
+    !!clientId && !!status.lastSyncedAt && status.unsynced && !status.connected)
+
+  function dropToken() {
+    token = null
+    status.connected = false
+    clearTimeout(expiryTimer)
+    localStorage.removeItem(TOKEN_KEY)
+  }
+
+  function useToken(next: DriveToken) {
+    token = next
+    status.connected = true
+    saveJson(TOKEN_KEY, next)
+    clearTimeout(expiryTimer)
+    // Fire on time rather than at the next change, so the indicator can't lag behind
+    expiryTimer = setTimeout(dropToken, next.expiresAt - TOKEN_MARGIN - Date.now())
+  }
+
+  function setUnsynced(value: boolean) {
+    status.unsynced = value
+    saveJson(UNSYNCED_KEY, value)
+  }
 
   async function collect(): Promise<AppBackup> {
     const { projects, threads, deleted } = workspace.state
@@ -117,14 +149,14 @@ export function useSync() {
 
   async function run(access: string) {
     status.syncing = true
+    const seen = changes
     try {
       await syncWithDrive(access)
+      // An edit made while uploading isn't in the file
+      if (changes === seen) setUnsynced(false)
     }
     catch (e) {
-      if (e instanceof DriveAuthError) {
-        token = null
-        status.connected = false
-      }
+      if (e instanceof DriveAuthError) dropToken()
       throw e
     }
     finally {
@@ -137,10 +169,7 @@ export function useSync() {
     if (status.syncing) return
     try {
       ensureIdle()
-      if (!hasToken()) {
-        token = await requestDriveToken(clientId)
-        status.connected = true
-      }
+      if (!hasToken()) useToken(await requestDriveToken(clientId))
       await run(token!.value)
       toast.show('구글 드라이브와 동기화했어요')
     }
@@ -149,14 +178,22 @@ export function useSync() {
     }
   }
 
+  /** On opening the app: a token that's still good needs no click. */
+  function resume() {
+    if (!clientId || !token) return
+    if (!hasToken()) return dropToken()
+    useToken(token)
+    run(token.value).catch(toast.error)
+  }
+
   /** Upload a little after changes stop, for as long as the current token lasts. */
   function schedule() {
+    changes++
+    if (!status.unsynced) setUnsynced(true)
     clearTimeout(timer)
+    if (!hasToken()) return
     timer = setTimeout(() => {
-      if (!hasToken()) {
-        status.connected = false
-        return
-      }
+      if (!hasToken()) return dropToken()
       if (status.syncing || chat.anyRunning.value) return schedule()
       run(token!.value).catch(toast.error)
     }, AUTO_SYNC_DELAY)
@@ -186,5 +223,5 @@ export function useSync() {
     }
   }
 
-  return { status, enabled: !!clientId, syncNow, schedule, markSettingsChanged, exportFile, importFile }
+  return { status, enabled: !!clientId, needsReconnect, syncNow, resume, schedule, markSettingsChanged, exportFile, importFile }
 }

@@ -3,6 +3,11 @@ import type { Project } from '~/composables/useWorkspace'
 
 const projectForm = useState<Project | 'new' | null>('project-form')
 const sync = useSync()
+
+const cloudTitle = computed(() => {
+  if (sync.needsReconnect.value) return '올라가지 않은 변경이 있어요 — 눌러서 다시 연결'
+  return sync.status.connected ? '구글 드라이브 연결됨 — 지금 동기화' : '구글 드라이브 연결하고 동기화'
+})
 </script>
 
 <template>
@@ -26,12 +31,13 @@ const sync = useSync()
         <button
           class="server cloud"
           :class="{ on: sync.status.connected, busy: sync.status.syncing }"
-          :title="sync.status.connected ? '구글 드라이브 연결됨 — 지금 동기화' : '구글 드라이브 연결하고 동기화'"
+:title="cloudTitle"
           :disabled="sync.status.syncing"
           @click="sync.syncNow"
         >
           <Icon name="cloud" :size="22" />
         </button>
+        <span v-if="sync.needsReconnect.value" class="unsynced" />
       </li>
     </ul>
   </nav>
@@ -111,6 +117,17 @@ ul {
 }
 .cloud.busy {
   opacity: 0.5;
+}
+.unsynced {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--bg-rail);
+  border-radius: 50%;
+  background: var(--danger);
+  pointer-events: none;
 }
 .sep {
   width: 32px;

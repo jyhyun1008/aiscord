@@ -76,7 +76,8 @@ async function onImport() {
       <p class="hint">
         프로젝트, 메모, 대화 내용과 프로필, 북마크, 테마가 포함돼요. API 키는 포함되지 않으니 기기마다 입력해 주세요.
         <template v-if="sync.enabled">
-          드라이브 연결은 약 1시간 유지되고, 그동안은 바뀐 내용이 자동으로 올라가요.
+          드라이브 연결은 약 1시간 유지되고, 그동안은 앱을 다시 열어도 바뀐 내용이 자동으로 동기화돼요.
+          <strong v-if="sync.needsReconnect.value" class="unsynced">올라가지 않은 변경이 있어요. 다시 연결해 주세요.</strong>
           <template v-if="sync.status.lastSyncedAt">마지막 동기화: {{ formatStamp(sync.status.lastSyncedAt) }}</template>
         </template>
       </p>
@@ -125,6 +126,9 @@ h3 {
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--fg-muted);
+}
+.unsynced {
+  color: var(--danger);
 }
 .sync {
   display: flex;
