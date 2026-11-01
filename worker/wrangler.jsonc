@@ -1,0 +1,18 @@
+{
+	"name": "aiscord-sync",
+	"main": "index.mjs",
+	"compatibility_date": "2026-11-02",
+	"workers_dev": true,
+	"vars": {
+		"APP_ORIGINS": "https://aiscord.gongran.studio,http://localhost:3224",
+		"GOOGLE_CLIENT_ID": "907541353767-n9neubgk7c4hem8e920f1g0vtidu3ps9.apps.googleusercontent.com",
+		"REDIRECT_URI": "https://aiscord-sync.hyun1008.workers.dev/auth/callback"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SESSIONS",
+			"id": "3315a1da1d2a433bb5754edd77bce672",
+			"remote": true
+		}
+	]
+}

@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   devServer: { port: 3224 },
   runtimeConfig: {
     // NUXT_PUBLIC_GOOGLE_CLIENT_ID; empty hides Google Drive sync
-    public: { googleClientId: '' },
+    public: { googleClientId: '', googleSyncUrl: '' },
   },
   css: ['katex/dist/katex.min.css', '~/assets/css/main.css', '~/assets/css/markdown.css'],
   app: {

@@ -20,9 +20,10 @@ type AppBackup = Backup<Project, Thread, Message, AppSettings>
 const LAST_SYNC_KEY = 'aiscord:last-sync'
 const SETTINGS_STAMP_KEY = 'aiscord:settings-changed-at'
 const TOKEN_KEY = 'aiscord:drive-token'
+const SESSION_KEY = 'aiscord:google-session'
 const UNSYNCED_KEY = 'aiscord:unsynced'
-// Long enough that a conversation in progress isn't uploaded after every answer
-const AUTO_SYNC_DELAY = 30000
+// Debounce edits; completed answers flush as soon as all streams finish.
+const AUTO_SYNC_DELAY = 2000
 const TOKEN_MARGIN = 60000
 
 const status = reactive({
@@ -34,6 +35,7 @@ const status = reactive({
   unsynced: loadJson(UNSYNCED_KEY, false),
 })
 // Kept across reloads; it only reaches this app's hidden Drive folder, and expires by itself
+let session = loadJson<string | null>(SESSION_KEY, null)
 let token = loadJson<DriveToken | null>(TOKEN_KEY, null)
 let timer: ReturnType<typeof setTimeout> | undefined
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
@@ -50,13 +52,18 @@ export function useSync() {
   const toast = useToast()
   const clientId = useRuntimeConfig().public.googleClientId as string
 
+  const workerUrl = (useRuntimeConfig().public.googleSyncUrl as string).replace(/\/$/, '')
+  const enabled = !!workerUrl || !!clientId
+  const hasAccess = () => workerUrl ? !!session : hasToken()
   const hasToken = () => !!token && token.expiresAt - TOKEN_MARGIN > Date.now()
 
   /** Someone who uses Drive has changes that won't upload until they reconnect. */
   const needsReconnect = computed(() =>
-    !!clientId && !!status.lastSyncedAt && status.unsynced && !status.connected)
+    enabled && !!status.lastSyncedAt && status.unsynced && !status.connected)
 
   function dropToken() {
+    session = null
+    localStorage.removeItem(SESSION_KEY)
     token = null
     status.connected = false
     clearTimeout(expiryTimer)
@@ -69,7 +76,7 @@ export function useSync() {
     saveJson(TOKEN_KEY, next)
     clearTimeout(expiryTimer)
     // Fire on time rather than at the next change, so the indicator can't lag behind
-    expiryTimer = setTimeout(dropToken, next.expiresAt - TOKEN_MARGIN - Date.now())
+    if (!workerUrl) expiryTimer = setTimeout(dropToken, next.expiresAt - TOKEN_MARGIN - Date.now())
   }
 
   function setUnsynced(value: boolean) {
@@ -138,20 +145,30 @@ export function useSync() {
   async function syncWithDrive(access: string) {
     const remoteId = await findBackupFile(access)
     const remoteText = remoteId ? await downloadBackup(access, remoteId) : null
+    if (chat.anyRunning.value) { schedule(); return false }
     const local = await collect()
+    if (chat.anyRunning.value) { schedule(); return false }
     const remote = remoteText ? parseBackup(remoteText) as AppBackup : { ...local, projects: [], threads: [], deleted: {}, messages: {} }
     const result = mergeBackups(dropUntouchedSeed(local, remote), remote)
     await apply(result)
     await uploadBackup(access, remoteId, JSON.stringify(result.merged))
     status.lastSyncedAt = Date.now()
     saveJson(LAST_SYNC_KEY, status.lastSyncedAt)
+    return true
   }
 
   async function run(access: string) {
     status.syncing = true
     const seen = changes
     try {
-      await syncWithDrive(access)
+      if (workerUrl) {
+        if (!session) throw new DriveAuthError()
+        const next = await googleSessionToken(workerUrl, session)
+        // Worker renews expired Google access tokens using its stored refresh token.
+        token = next
+        access = next.value
+      }
+      if (!await syncWithDrive(access)) return
       // An edit made while uploading isn't in the file
       if (changes === seen) setUnsynced(false)
     }
@@ -169,8 +186,15 @@ export function useSync() {
     if (status.syncing) return
     try {
       ensureIdle()
-      if (!hasToken()) useToken(await requestDriveToken(clientId))
-      await run(token!.value)
+      if (workerUrl) {
+        if (!session) {
+          session = await connectGoogleSession(workerUrl)
+          saveJson(SESSION_KEY, session)
+        }
+        status.connected = true
+      }
+      else if (!hasToken()) useToken(await requestDriveToken(clientId))
+      await run(token?.value ?? '')
       toast.show('구글 드라이브와 동기화했어요')
     }
     catch (e) {
@@ -180,23 +204,44 @@ export function useSync() {
 
   /** On opening the app: a token that's still good needs no click. */
   function resume() {
+    if (workerUrl) {
+      status.connected = !!session
+      if (session) run('').catch(toast.error)
+      return
+    }
     if (!clientId || !token) return
     if (!hasToken()) return dropToken()
     useToken(token)
     run(token.value).catch(toast.error)
   }
 
-  /** Upload a little after changes stop, for as long as the current token lasts. */
+  /** Debounce local edits while a Google connection is available. */
   function schedule() {
     changes++
     if (!status.unsynced) setUnsynced(true)
     clearTimeout(timer)
-    if (!hasToken()) return
-    timer = setTimeout(() => {
-      if (!hasToken()) return dropToken()
-      if (status.syncing || chat.anyRunning.value) return schedule()
-      run(token!.value).catch(toast.error)
-    }, AUTO_SYNC_DELAY)
+    if (!hasAccess()) return
+    timer = setTimeout(flush, AUTO_SYNC_DELAY)
+  }
+
+  function flush() {
+    clearTimeout(timer)
+    if (!status.unsynced || !hasAccess()) return
+    if (status.syncing || chat.anyRunning.value) {
+      timer = setTimeout(flush, AUTO_SYNC_DELAY)
+      return
+    }
+    run(token?.value ?? '').catch(toast.error)
+  }
+
+  async function disconnect() {
+    try {
+      if (workerUrl && session) await disconnectGoogleSession(workerUrl, session)
+      clearTimeout(timer)
+      dropToken()
+      toast.show('구글 연결을 해제했어요')
+    }
+    catch (e) { toast.error(e) }
   }
 
   async function exportFile() {
@@ -223,5 +268,5 @@ export function useSync() {
     }
   }
 
-  return { status, enabled: !!clientId, needsReconnect, syncNow, resume, schedule, markSettingsChanged, exportFile, importFile }
+  return { status, enabled, persistent: !!workerUrl, needsReconnect, syncNow, disconnect, resume, schedule, flush, markSettingsChanged, exportFile, importFile }
 }

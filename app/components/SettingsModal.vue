@@ -70,13 +70,15 @@ async function onImport() {
         <input ref="importInput" class="sr-only" type="file" accept="application/json,.json" tabindex="-1" aria-hidden="true" @change="onImport">
         <button class="btn small" @click="importInput?.click()"><Icon name="upload" :size="14" /> 가져오기</button>
         <button v-if="sync.enabled" class="btn small" :disabled="sync.status.syncing" @click="sync.syncNow">
-          <Icon name="cloud" :size="14" /> {{ sync.status.connected ? '지금 동기화' : '구글 드라이브 연결' }}
+          <Icon name="cloud" :size="14" /> {{ sync.status.connected ? '지금 동기화' : '구글로 로그인하고 동기화' }}
         </button>
+        <button v-if="sync.persistent && sync.status.connected" class="btn small" :disabled="sync.status.syncing" @click="sync.disconnect">구글 연결 해제</button>
       </div>
       <p class="hint">
         프로젝트, 메모, 대화 내용과 프로필, 북마크, 테마가 포함돼요. API 키는 포함되지 않으니 기기마다 입력해 주세요.
         <template v-if="sync.enabled">
-          드라이브 연결은 약 1시간 유지되고, 그동안은 앱을 다시 열어도 바뀐 내용이 자동으로 동기화돼요.
+          <template v-if="sync.persistent">구글 연결을 유지하며 답변이 끝나면 자동으로 동기화해요.</template>
+          <template v-else>드라이브 연결은 약 1시간 유지되고, 그동안 답변이 끝나면 자동으로 동기화해요.</template>
           <strong v-if="sync.needsReconnect.value" class="unsynced">올라가지 않은 변경이 있어요. 다시 연결해 주세요.</strong>
           <template v-if="sync.status.lastSyncedAt">마지막 동기화: {{ formatStamp(sync.status.lastSyncedAt) }}</template>
         </template>
